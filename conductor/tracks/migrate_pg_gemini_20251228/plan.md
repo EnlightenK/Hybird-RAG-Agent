@@ -23,5 +23,5 @@
 - [x] Task: Write tests for PostgreSQL hybrid search (Vector + Full-Text) 3601b19
 - [x] Task: Re-implement search tools in `src/tools.py` using SQL and pgvector f5ed32e
 - [x] Task: Update `src/agent.py` and `src/cli.py` to ensure compatibility with PostgreSQL results 418fb93
-- [ ] Task: Run comprehensive E2E tests to verify the entire pipeline
+- [x] Task: Run comprehensive E2E tests to verify the entire pipeline (User Manual Verification)
 - [ ] Task: Conductor - User Manual Verification 'Search Tools and Agent Integration' (Protocol in workflow.md)

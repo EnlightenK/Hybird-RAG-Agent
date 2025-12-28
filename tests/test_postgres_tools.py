@@ -9,6 +9,14 @@ sys.path.append(os.getcwd())
 from src.tools import semantic_search, text_search, hybrid_search, SearchResult
 from src.dependencies import AgentDependencies
 
+class MockAcquireContext:
+    def __init__(self, mock_conn):
+        self.mock_conn = mock_conn
+    async def __aenter__(self):
+        return self.mock_conn
+    async def __aexit__(self, exc_type, exc, tb):
+        pass
+
 @pytest.fixture
 async def mock_ctx():
     """Setup mock AgentDependencies and RunContext."""
@@ -19,59 +27,62 @@ async def mock_ctx():
     deps.settings.max_match_count = 10
     
     # Mock pg_pool
-    deps.pg_pool = AsyncMock()
+    mock_pool = MagicMock() # Use MagicMock for the pool itself
+    mock_conn = AsyncMock()
+    # pool.acquire() should return the context manager
+    mock_pool.acquire.return_value = MockAcquireContext(mock_conn)
+    deps.pg_pool = mock_pool
     
     # Mock embedding generation
     deps.get_embedding = AsyncMock(return_value=[0.1]*768)
     
     ctx = MagicMock()
     ctx.deps = deps
-    return ctx
+    return ctx, mock_conn
 
 @pytest.mark.asyncio
 async def test_semantic_search_sql(mock_ctx):
     """Test semantic search uses correct SQL."""
-    # We expect this to fail initially with MongoDB-specific logic
+    ctx, mock_conn = mock_ctx
     query = "test query"
     
     # Setup mock return from DB
-    mock_ctx.deps.pg_pool.acquire.return_value.__aenter__.return_value.fetch.return_value = [
+    mock_conn.fetch.return_value = [
         {
             'chunk_id': 'c1',
             'document_id': 'd1',
             'content': 'test content',
             'similarity': 0.9,
-            'metadata': '{}',
+            'chunk_metadata': '{}',
             'document_title': 'doc title',
             'document_source': 'doc source'
         }
     ]
     
-    try:
-        results = await semantic_search(mock_ctx, query)
-        assert len(results) > 0
-        assert results[0].content == 'test content'
-    except Exception as e:
-        # If it fails due to pymongo not being installed or other MongoDB logic
-        pytest.fail(f"semantic_search failed: {e}")
+    results = await semantic_search(ctx, query)
+    assert len(results) > 0
+    assert results[0].content == 'test content'
+    assert results[0].similarity == 0.9
 
 @pytest.mark.asyncio
 async def test_text_search_sql(mock_ctx):
     """Test text search uses correct SQL."""
+    ctx, mock_conn = mock_ctx
     query = "test query"
     
     # Setup mock return from DB
-    mock_ctx.deps.pg_pool.acquire.return_value.__aenter__.return_value.fetch.return_value = [
+    mock_conn.fetch.return_value = [
         {
             'chunk_id': 'c1',
             'document_id': 'd1',
             'content': 'test content',
             'similarity': 0.8,
-            'metadata': '{}',
+            'chunk_metadata': '{}',
             'document_title': 'doc title',
             'document_source': 'doc source'
         }
     ]
     
-    results = await text_search(mock_ctx, query)
+    results = await text_search(ctx, query)
     assert len(results) > 0
+    assert results[0].similarity == 0.8

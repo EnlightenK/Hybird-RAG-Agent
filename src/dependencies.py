@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 import logging
 import asyncpg
 import openai
+import google.generativeai as genai
 from src.settings import load_settings
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ class AgentDependencies:
         """
         if not self.settings:
             self.settings = load_settings()
-            logger.info("settings_loaded", database=self.settings.postgres_db)
+            logger.info(f"Settings loaded for database: {self.settings.postgres_db}")
 
         # Initialize PostgreSQL pool
         if not self.pg_pool:
@@ -49,24 +50,24 @@ class AgentDependencies:
                     max_size=10
                 )
                 logger.info(
-                    "postgresql_pool_initialized",
-                    database=self.settings.postgres_db,
-                    host=self.settings.postgres_host
+                    f"PostgreSQL pool initialized for {self.settings.postgres_db} at {self.settings.postgres_host}"
                 )
             except Exception as e:
-                logger.exception("postgresql_connection_failed", error=str(e))
+                logger.exception(f"PostgreSQL connection failed: {e}")
                 raise
 
-        # Initialize OpenAI client for embeddings
-        if not self.openai_client:
+        # Initialize Embedding Provider
+        if self.settings.embedding_provider.lower() == "gemini":
+            genai.configure(api_key=self.settings.embedding_api_key)
+            logger.info(f"Gemini embedding initialized with model: {self.settings.embedding_model}")
+        elif not self.openai_client:
+            # Initialize OpenAI client for embeddings
             self.openai_client = openai.AsyncOpenAI(
                 api_key=self.settings.embedding_api_key,
                 base_url=self.settings.embedding_base_url,
             )
             logger.info(
-                "openai_client_initialized",
-                model=self.settings.embedding_model,
-                dimension=self.settings.embedding_dimension,
+                f"OpenAI client initialized with model: {self.settings.embedding_model}"
             )
 
     async def cleanup(self) -> None:
@@ -74,11 +75,11 @@ class AgentDependencies:
         if self.pg_pool:
             await self.pg_pool.close()
             self.pg_pool = None
-            logger.info("postgresql_connection_closed")
+            logger.info("PostgreSQL connection closed")
 
     async def get_embedding(self, text: str) -> list[float]:
         """
-        Generate embedding for text using OpenAI.
+        Generate embedding for text using the configured provider (OpenAI or Gemini).
 
         Args:
             text: Text to embed
@@ -89,13 +90,24 @@ class AgentDependencies:
         Raises:
             Exception: If embedding generation fails
         """
-        if not self.openai_client:
+        if not self.settings:
             await self.initialize()
 
-        response = await self.openai_client.embeddings.create(
-            model=self.settings.embedding_model, input=text
-        )
-        return response.data[0].embedding
+        if self.settings.embedding_provider.lower() == "gemini":
+             result = genai.embed_content(
+                model=self.settings.embedding_model,
+                content=text,
+                task_type="retrieval_query"
+            )
+             return result['embedding']
+        else:
+            if not self.openai_client:
+                await self.initialize()
+
+            response = await self.openai_client.embeddings.create(
+                model=self.settings.embedding_model, input=text
+            )
+            return response.data[0].embedding
 
     def set_user_preference(self, key: str, value: Any) -> None:
         """

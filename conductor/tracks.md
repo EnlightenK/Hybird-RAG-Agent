@@ -4,5 +4,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [ ] Track: Migrate RAG pipeline to PostgreSQL and Gemini
+## [~] Track: Migrate RAG pipeline to PostgreSQL and Gemini
 *Link: [./conductor/tracks/migrate_pg_gemini_20251228/](./conductor/tracks/migrate_pg_gemini_20251228/)*
