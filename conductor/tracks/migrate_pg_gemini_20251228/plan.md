@@ -6,12 +6,12 @@
 - [x] Task: Create PostgreSQL schema and migration scripts for `documents` and `chunks` tables 9961a59
 - [x] Task: Conductor - User Manual Verification 'Environment and Database Setup' (Protocol in workflow.md)
 
-## Phase 2: Core Infrastructure Migration
+## Phase 2: Core Infrastructure Migration [checkpoint: bb7406e]
 - [x] Task: Write tests for PostgreSQL connection and dependency injection b6c3046
 - [x] Task: Implement PostgreSQL connection management in `src/dependencies.py` b12388f
 - [x] Task: Write tests for Gemini embedding provider db46df5
 - [x] Task: Implement Gemini embedding provider in `src/providers.py` 04808ee
-- [ ] Task: Conductor - User Manual Verification 'Core Infrastructure Migration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Core Infrastructure Migration' (Protocol in workflow.md)
 
 ## Phase 3: Ingestion Pipeline Migration
 - [ ] Task: Write tests for PostgreSQL ingestion logic
