@@ -1,23 +1,20 @@
 """
-Main ingestion script for processing documents into MongoDB vector database.
-
-This adapts the examples/ingestion/ingest.py pipeline to use MongoDB instead of PostgreSQL,
-changing only the database layer while preserving all document processing logic.
+Main ingestion script for processing documents into PostgreSQL vector database.
 """
 
 import os
 import asyncio
 import logging
 import glob
+import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import argparse
 from dataclasses import dataclass
+import uuid
 
-from pymongo import AsyncMongoClient
-from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
-from bson import ObjectId
+import asyncpg
 from dotenv import load_dotenv
 
 from src.ingestion.chunker import ChunkingConfig, create_chunker, DocumentChunk
@@ -50,7 +47,7 @@ class IngestionResult:
 
 
 class DocumentIngestionPipeline:
-    """Pipeline for ingesting documents into MongoDB vector database."""
+    """Pipeline for ingesting documents into PostgreSQL vector database."""
 
     def __init__(
         self,
@@ -73,9 +70,8 @@ class DocumentIngestionPipeline:
         # Load settings
         self.settings = load_settings()
 
-        # Initialize MongoDB client and database references
-        self.mongo_client: Optional[AsyncMongoClient] = None
-        self.db: Optional[Any] = None
+        # Initialize PostgreSQL pool reference
+        self.pg_pool: Optional[asyncpg.Pool] = None
 
         # Initialize components
         self.chunker_config = ChunkingConfig(
@@ -92,11 +88,10 @@ class DocumentIngestionPipeline:
 
     async def initialize(self) -> None:
         """
-        Initialize MongoDB connections.
+        Initialize PostgreSQL connections.
 
         Raises:
-            ConnectionFailure: If MongoDB connection fails
-            ServerSelectionTimeoutError: If MongoDB server selection times out
+            Exception: If PostgreSQL connection fails
         """
         if self._initialized:
             return
@@ -104,34 +99,39 @@ class DocumentIngestionPipeline:
         logger.info("Initializing ingestion pipeline...")
 
         try:
-            # Initialize MongoDB client
-            self.mongo_client = AsyncMongoClient(
-                self.settings.mongodb_uri,
-                serverSelectionTimeoutMS=5000
+            # Initialize PostgreSQL pool
+            self.pg_pool = await asyncpg.create_pool(
+                user=self.settings.postgres_user,
+                password=self.settings.postgres_password,
+                database=self.settings.postgres_db,
+                host=self.settings.postgres_host,
+                port=self.settings.postgres_port,
+                min_size=1,
+                max_size=10
             )
-            self.db = self.mongo_client[self.settings.mongodb_database]
-
+            
             # Verify connection
-            await self.mongo_client.admin.command("ping")
+            async with self.pg_pool.acquire() as conn:
+                await conn.execute("SELECT 1")
+            
             logger.info(
-                f"Connected to MongoDB database: {self.settings.mongodb_database}"
+                f"Connected to PostgreSQL database: {self.settings.postgres_db}"
             )
 
-        except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-            logger.exception("mongodb_connection_failed", error=str(e))
+        except Exception as e:
+            logger.exception("postgresql_connection_failed", error=str(e))
             raise
 
         self._initialized = True
         logger.info("Ingestion pipeline initialized")
 
     async def close(self) -> None:
-        """Close MongoDB connections."""
-        if self._initialized and self.mongo_client:
-            await self.mongo_client.close()
-            self.mongo_client = None
-            self.db = None
+        """Close PostgreSQL connections."""
+        if self._initialized and self.pg_pool:
+            await self.pg_pool.close()
+            self.pg_pool = None
             self._initialized = False
-            logger.info("MongoDB connection closed")
+            logger.info("PostgreSQL connection closed")
 
     def _find_document_files(self) -> List[str]:
         """
@@ -182,7 +182,6 @@ class DocumentIngestionPipeline:
         # Audio formats - transcribe with Whisper ASR
         audio_formats = ['.mp3', '.wav', '.m4a', '.flac']
         if file_ext in audio_formats:
-            # Returns tuple: (markdown_content, docling_document)
             return self._transcribe_audio(file_path)
 
         # Docling-supported formats (convert to markdown)
@@ -365,7 +364,7 @@ class DocumentIngestionPipeline:
 
         return metadata
 
-    async def _save_to_mongodb(
+    async def _save_to_postgres(
         self,
         title: str,
         source: str,
@@ -374,7 +373,7 @@ class DocumentIngestionPipeline:
         metadata: Dict[str, Any]
     ) -> str:
         """
-        Save document and chunks to MongoDB.
+        Save document and chunks to PostgreSQL.
 
         Args:
             title: Document title
@@ -384,69 +383,64 @@ class DocumentIngestionPipeline:
             metadata: Document metadata
 
         Returns:
-            Document ID (ObjectId as string)
+            Document ID (string)
 
         Raises:
-            Exception: If MongoDB operations fail
+            Exception: If PostgreSQL operations fail
         """
-        # Get collection references
-        documents_collection = self.db[
-            self.settings.mongodb_collection_documents
-        ]
-        chunks_collection = self.db[self.settings.mongodb_collection_chunks]
+        if not self.pg_pool:
+            await self.initialize()
 
-        # Insert document
-        document_dict = {
-            "title": title,
-            "source": source,
-            "content": content,
-            "metadata": metadata,
-            "created_at": datetime.now()
-        }
+        async with self.pg_pool.acquire() as conn:
+            async with conn.transaction():
+                # Insert document
+                doc_id = str(uuid.uuid4())
+                file_size = metadata.get("file_size", len(content))
+                content_type = os.path.splitext(source)[1].lower()
+                
+                await conn.execute(
+                    """
+                    INSERT INTO documents (id, filename, content_type, size, metadata)
+                    VALUES ($1, $2, $3, $4, $5)
+                    """,
+                    doc_id, source, content_type, file_size, json.dumps(metadata)
+                )
 
-        document_result = await documents_collection.insert_one(document_dict)
-        document_id = document_result.inserted_id
+                logger.info(f"Inserted document with ID: {doc_id}")
 
-        logger.info(f"Inserted document with ID: {document_id}")
+                # Insert chunks
+                for chunk in chunks:
+                    chunk_id = str(uuid.uuid4())
+                    # pgvector expects string format for VECTOR type or specific codec
+                    embedding_str = str(chunk.embedding)
+                    await conn.execute(
+                        """
+                        INSERT INTO chunks (id, document_id, content, chunk_index, embedding, metadata)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        """,
+                        chunk_id, doc_id, chunk.content, chunk.index, 
+                        embedding_str, json.dumps(chunk.metadata)
+                    )
 
-        # Insert chunks with embeddings as Python lists
-        chunk_dicts = []
-        for chunk in chunks:
-            chunk_dict = {
-                "document_id": document_id,
-                "content": chunk.content,
-                "embedding": chunk.embedding,  # Python list, NOT string!
-                "chunk_index": chunk.index,
-                "metadata": chunk.metadata,
-                "token_count": chunk.token_count,
-                "created_at": datetime.now()
-            }
-            chunk_dicts.append(chunk_dict)
+                logger.info(f"Inserted {len(chunks)} chunks")
 
-        # Batch insert with ordered=False for partial success
-        if chunk_dicts:
-            await chunks_collection.insert_many(chunk_dicts, ordered=False)
-            logger.info(f"Inserted {len(chunk_dicts)} chunks")
-
-        return str(document_id)
+                return doc_id
 
     async def _clean_databases(self) -> None:
-        """Clean existing data from MongoDB collections."""
-        logger.warning("Cleaning existing data from MongoDB...")
+        """Clean existing data from PostgreSQL."""
+        logger.warning("Cleaning existing data from PostgreSQL...")
 
-        # Get collection references
-        documents_collection = self.db[
-            self.settings.mongodb_collection_documents
-        ]
-        chunks_collection = self.db[self.settings.mongodb_collection_chunks]
+        if not self.pg_pool:
+            await self.initialize()
 
-        # Delete all chunks first (to respect FK relationships)
-        chunks_result = await chunks_collection.delete_many({})
-        logger.info(f"Deleted {chunks_result.deleted_count} chunks")
+        async with self.pg_pool.acquire() as conn:
+            # Delete all chunks first due to FK
+            chunks_result = await conn.execute("DELETE FROM chunks")
+            logger.info(f"Deleted chunks")
 
-        # Delete all documents
-        docs_result = await documents_collection.delete_many({})
-        logger.info(f"Deleted {docs_result.deleted_count} documents")
+            # Delete all documents
+            docs_result = await conn.execute("DELETE FROM documents")
+            logger.info(f"Deleted documents")
 
     async def _ingest_single_document(self, file_path: str) -> IngestionResult:
         """
@@ -479,7 +473,7 @@ class DocumentIngestionPipeline:
             title=document_title,
             source=document_source,
             metadata=document_metadata,
-            docling_doc=docling_doc  # Pass DoclingDocument for HybridChunker
+            docling_doc=docling_doc
         )
 
         if not chunks:
@@ -500,8 +494,8 @@ class DocumentIngestionPipeline:
         embedded_chunks = await self.embedder.embed_chunks(chunks)
         logger.info(f"Generated embeddings for {len(embedded_chunks)} chunks")
 
-        # Save to MongoDB
-        document_id = await self._save_to_mongodb(
+        # Save to PostgreSQL
+        document_id = await self._save_to_postgres(
             document_title,
             document_source,
             document_content,
@@ -509,7 +503,7 @@ class DocumentIngestionPipeline:
             document_metadata
         )
 
-        logger.info(f"Saved document to MongoDB with ID: {document_id}")
+        logger.info(f"Saved document to PostgreSQL with ID: {document_id}")
 
         # Calculate processing time
         processing_time = (
@@ -594,7 +588,7 @@ class DocumentIngestionPipeline:
 async def main() -> None:
     """Main function for running ingestion."""
     parser = argparse.ArgumentParser(
-        description="Ingest documents into MongoDB vector database"
+        description="Ingest documents into PostgreSQL vector database"
     )
     parser.add_argument(
         "--documents", "-d",
@@ -647,11 +641,11 @@ async def main() -> None:
         max_tokens=args.max_tokens
     )
 
-    # Create and run pipeline - clean by default unless --no-clean is specified
+    # Create and run pipeline
     pipeline = DocumentIngestionPipeline(
         config=config,
         documents_folder=args.documents,
-        clean_before_ingest=not args.no_clean  # Clean by default
+        clean_before_ingest=not args.no_clean
     )
 
     def progress_callback(current: int, total: int) -> None:
@@ -683,23 +677,6 @@ async def main() -> None:
             if result.errors:
                 for error in result.errors:
                     print(f"  Error: {error}")
-
-        # Print next steps
-        print("\n" + "="*50)
-        print("NEXT STEPS")
-        print("="*50)
-        print("1. Create vector search index in Atlas UI:")
-        print("   - Index name: vector_index")
-        print("   - Collection: chunks")
-        print("   - Field: embedding")
-        print("   - Dimensions: 1536 (for text-embedding-3-small)")
-        print()
-        print("2. Create text search index in Atlas UI:")
-        print("   - Index name: text_index")
-        print("   - Collection: chunks")
-        print("   - Field: content")
-        print()
-        print("See .claude/reference/mongodb-patterns.md for detailed instructions")
 
     except KeyboardInterrupt:
         print("\nIngestion interrupted by user")

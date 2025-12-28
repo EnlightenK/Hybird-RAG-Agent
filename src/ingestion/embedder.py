@@ -3,11 +3,13 @@ Document embedding generation for vector search.
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
 
 from dotenv import load_dotenv
 import openai
+from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.providers.google import GoogleProvider
 
 from src.ingestion.chunker import DocumentChunk
 from src.settings import load_settings
@@ -19,10 +21,20 @@ logger = logging.getLogger(__name__)
 
 # Initialize client with settings
 settings = load_settings()
-embedding_client = openai.AsyncOpenAI(
-    api_key=settings.embedding_api_key,
-    base_url=settings.embedding_base_url
-)
+
+def get_embedding_client():
+    """Initialize embedding client based on provider."""
+    provider = settings.embedding_provider.lower()
+    if provider == "gemini":
+        google_provider = GoogleProvider(api_key=settings.embedding_api_key)
+        return GoogleModel(settings.embedding_model, provider=google_provider)
+    else:
+        return openai.AsyncOpenAI(
+            api_key=settings.embedding_api_key,
+            base_url=settings.embedding_base_url
+        )
+
+embedding_client = get_embedding_client()
 EMBEDDING_MODEL = settings.embedding_model
 
 
@@ -43,17 +55,19 @@ class EmbeddingGenerator:
         """
         self.model = model
         self.batch_size = batch_size
+        self.provider = settings.embedding_provider.lower()
 
         # Model-specific configurations
         self.model_configs = {
             "text-embedding-3-small": {"dimensions": 1536, "max_tokens": 8191},
             "text-embedding-3-large": {"dimensions": 3072, "max_tokens": 8191},
-            "text-embedding-ada-002": {"dimensions": 1536, "max_tokens": 8191}
+            "text-embedding-ada-002": {"dimensions": 1536, "max_tokens": 8191},
+            "models/embedding-001": {"dimensions": 768, "max_tokens": 2048} # Gemini
         }
 
         self.config = self.model_configs.get(
             model,
-            {"dimensions": 1536, "max_tokens": 8191}
+            {"dimensions": 768 if "embedding-001" in model else 1536, "max_tokens": 2048 if "embedding-001" in model else 8191}
         )
 
     async def generate_embedding(self, text: str) -> List[float]:
@@ -66,16 +80,27 @@ class EmbeddingGenerator:
         Returns:
             Embedding vector
         """
-        # Truncate text if too long (rough estimation: 4 chars per token)
+        # Truncate text if too long
         if len(text) > self.config["max_tokens"] * 4:
             text = text[:self.config["max_tokens"] * 4]
 
-        response = await embedding_client.embeddings.create(
-            model=self.model,
-            input=text
-        )
-
-        return response.data[0].embedding
+        if self.provider == "gemini":
+            # Pydantic AI's GoogleModel might not have a direct embeddings method 
+            # if it's meant for Chat. We might need to use the native google-generativeai
+            import google.generativeai as genai
+            genai.configure(api_key=settings.embedding_api_key)
+            result = genai.embed_content(
+                model=self.model,
+                content=text,
+                task_type="retrieval_document"
+            )
+            return result['embedding']
+        else:
+            response = await embedding_client.embeddings.create(
+                model=self.model,
+                input=text
+            )
+            return response.data[0].embedding
 
     async def generate_embeddings_batch(
         self,
@@ -97,12 +122,21 @@ class EmbeddingGenerator:
                 text = text[:self.config["max_tokens"] * 4]
             processed_texts.append(text)
 
-        response = await embedding_client.embeddings.create(
-            model=self.model,
-            input=processed_texts
-        )
-
-        return [data.embedding for data in response.data]
+        if self.provider == "gemini":
+            import google.generativeai as genai
+            genai.configure(api_key=settings.embedding_api_key)
+            result = genai.embed_content(
+                model=self.model,
+                content=processed_texts,
+                task_type="retrieval_document"
+            )
+            return result['embedding']
+        else:
+            response = await embedding_client.embeddings.create(
+                model=self.model,
+                input=processed_texts
+            )
+            return [data.embedding for data in response.data]
 
     async def embed_chunks(
         self,
@@ -172,7 +206,17 @@ class EmbeddingGenerator:
         Returns:
             Query embedding
         """
-        return await self.generate_embedding(query)
+        if self.provider == "gemini":
+            import google.generativeai as genai
+            genai.configure(api_key=settings.embedding_api_key)
+            result = genai.embed_content(
+                model=self.model,
+                content=query,
+                task_type="retrieval_query"
+            )
+            return result['embedding']
+        else:
+            return await self.generate_embedding(query)
 
     def get_embedding_dimension(self) -> int:
         """Get the dimension of embeddings for this model."""
