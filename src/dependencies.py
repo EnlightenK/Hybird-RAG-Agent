@@ -3,8 +3,8 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
 import logging
-from pymongo import AsyncMongoClient
-from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+# from pymongo import AsyncMongoClient
+# from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 import openai
 from src.settings import load_settings
 
@@ -16,7 +16,8 @@ class AgentDependencies:
     """Dependencies injected into the agent context."""
 
     # Core dependencies
-    mongo_client: Optional[AsyncMongoClient] = None
+    # mongo_client: Optional[AsyncMongoClient] = None
+    mongo_client: Optional[Any] = None # Placeholder
     db: Optional[Any] = None
     openai_client: Optional[openai.AsyncOpenAI] = None
     settings: Optional[Any] = None
@@ -40,26 +41,26 @@ class AgentDependencies:
             logger.info("settings_loaded", database=self.settings.mongodb_database)
 
         # Initialize MongoDB client
-        if not self.mongo_client:
-            try:
-                self.mongo_client = AsyncMongoClient(
-                    self.settings.mongodb_uri, serverSelectionTimeoutMS=5000
-                )
-                self.db = self.mongo_client[self.settings.mongodb_database]
+        # if not self.mongo_client:
+        #     try:
+        #         self.mongo_client = AsyncMongoClient(
+        #             self.settings.mongodb_uri, serverSelectionTimeoutMS=5000
+        #         )
+        #         self.db = self.mongo_client[self.settings.mongodb_database]
 
-                # Verify connection with ping
-                await self.mongo_client.admin.command("ping")
-                logger.info(
-                    "mongodb_connected",
-                    database=self.settings.mongodb_database,
-                    collections={
-                        "documents": self.settings.mongodb_collection_documents,
-                        "chunks": self.settings.mongodb_collection_chunks,
-                    },
-                )
-            except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-                logger.exception("mongodb_connection_failed", error=str(e))
-                raise
+        #         # Verify connection with ping
+        #         await self.mongo_client.admin.command("ping")
+        #         logger.info(
+        #             "mongodb_connected",
+        #             database=self.settings.mongodb_database,
+        #             collections={
+        #                 "documents": self.settings.mongodb_collection_documents,
+        #                 "chunks": self.settings.mongodb_collection_chunks,
+        #             },
+        #         )
+        #     except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        #         logger.exception("mongodb_connection_failed", error=str(e))
+        #         raise
 
         # Initialize OpenAI client for embeddings
         if not self.openai_client:
