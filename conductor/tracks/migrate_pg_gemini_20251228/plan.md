@@ -7,7 +7,7 @@
 - [x] Task: Conductor - User Manual Verification 'Environment and Database Setup' (Protocol in workflow.md)
 
 ## Phase 2: Core Infrastructure Migration
-- [ ] Task: Write tests for PostgreSQL connection and dependency injection
+- [x] Task: Write tests for PostgreSQL connection and dependency injection b6c3046
 - [ ] Task: Implement PostgreSQL connection management in `src/dependencies.py`
 - [ ] Task: Write tests for Gemini embedding provider
 - [ ] Task: Implement Gemini embedding provider in `src/providers.py`
