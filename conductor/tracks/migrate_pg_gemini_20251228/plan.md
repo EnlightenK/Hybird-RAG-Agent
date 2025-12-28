@@ -13,11 +13,11 @@
 - [x] Task: Implement Gemini embedding provider in `src/providers.py` 04808ee
 - [x] Task: Conductor - User Manual Verification 'Core Infrastructure Migration' (Protocol in workflow.md)
 
-## Phase 3: Ingestion Pipeline Migration
+## Phase 3: Ingestion Pipeline Migration [checkpoint: 0bbbc37]
 - [x] Task: Write tests for PostgreSQL ingestion logic 72ee68f
 - [x] Task: Update `src/ingestion/ingest.py` to support PostgreSQL 5aa5534
 - [x] Task: Write tests for chunk storage and retrieval 884a17d
-- [ ] Task: Conductor - User Manual Verification 'Ingestion Pipeline Migration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Ingestion Pipeline Migration' (Protocol in workflow.md)
 
 ## Phase 4: Search Tools and Agent Integration
 - [ ] Task: Write tests for PostgreSQL hybrid search (Vector + Full-Text)
