@@ -10,7 +10,7 @@
 - [x] Task: Write tests for PostgreSQL connection and dependency injection b6c3046
 - [x] Task: Implement PostgreSQL connection management in `src/dependencies.py` b12388f
 - [x] Task: Write tests for Gemini embedding provider db46df5
-- [ ] Task: Implement Gemini embedding provider in `src/providers.py`
+- [x] Task: Implement Gemini embedding provider in `src/providers.py` 04808ee
 - [ ] Task: Conductor - User Manual Verification 'Core Infrastructure Migration' (Protocol in workflow.md)
 
 ## Phase 3: Ingestion Pipeline Migration
