@@ -19,9 +19,9 @@
 - [x] Task: Write tests for chunk storage and retrieval 884a17d
 - [x] Task: Conductor - User Manual Verification 'Ingestion Pipeline Migration' (Protocol in workflow.md)
 
-## Phase 4: Search Tools and Agent Integration
+## Phase 4: Search Tools and Agent Integration [checkpoint: 0567a13]
 - [x] Task: Write tests for PostgreSQL hybrid search (Vector + Full-Text) 3601b19
 - [x] Task: Re-implement search tools in `src/tools.py` using SQL and pgvector f5ed32e
 - [x] Task: Update `src/agent.py` and `src/cli.py` to ensure compatibility with PostgreSQL results 418fb93
 - [x] Task: Run comprehensive E2E tests to verify the entire pipeline (User Manual Verification)
-- [ ] Task: Conductor - User Manual Verification 'Search Tools and Agent Integration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Search Tools and Agent Integration' (Protocol in workflow.md) 0567a13
