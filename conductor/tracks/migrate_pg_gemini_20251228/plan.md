@@ -20,7 +20,7 @@
 - [x] Task: Conductor - User Manual Verification 'Ingestion Pipeline Migration' (Protocol in workflow.md)
 
 ## Phase 4: Search Tools and Agent Integration
-- [ ] Task: Write tests for PostgreSQL hybrid search (Vector + Full-Text)
+- [x] Task: Write tests for PostgreSQL hybrid search (Vector + Full-Text) 3601b19
 - [ ] Task: Re-implement search tools in `src/tools.py` using SQL and pgvector
 - [ ] Task: Update `src/agent.py` and `src/cli.py` to ensure compatibility with PostgreSQL results
 - [ ] Task: Run comprehensive E2E tests to verify the entire pipeline
