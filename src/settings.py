@@ -16,8 +16,8 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
 
-    # MongoDB Configuration
-    mongodb_uri: str = Field(..., description="MongoDB Atlas connection string")
+    # MongoDB Configuration (Deprecated)
+    mongodb_uri: Optional[str] = Field(default=None, description="MongoDB Atlas connection string")
 
     mongodb_database: str = Field(default="rag_db", description="MongoDB database name")
 
@@ -38,6 +38,13 @@ class Settings(BaseSettings):
         default="text_index",
         description="Full-text search index name (must be created in Atlas UI)",
     )
+
+    # PostgreSQL Configuration
+    postgres_db: str = Field(default="rag_db", description="PostgreSQL database name")
+    postgres_user: str = Field(default="rag_user", description="PostgreSQL user")
+    postgres_password: str = Field(default="rag_password", description="PostgreSQL password")
+    postgres_host: str = Field(default="localhost", description="PostgreSQL host")
+    postgres_port: int = Field(default=5432, description="PostgreSQL port")
 
     # LLM Configuration (OpenAI-compatible)
     llm_provider: str = Field(
@@ -95,8 +102,6 @@ def load_settings() -> Settings:
         return Settings()
     except Exception as e:
         error_msg = f"Failed to load settings: {e}"
-        if "mongodb_uri" in str(e).lower():
-            error_msg += "\nMake sure to set MONGODB_URI in your .env file"
         if "llm_api_key" in str(e).lower():
             error_msg += "\nMake sure to set LLM_API_KEY in your .env file"
         if "embedding_api_key" in str(e).lower():
