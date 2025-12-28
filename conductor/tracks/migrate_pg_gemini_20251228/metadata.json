@@ -1,0 +1,8 @@
+{
+  "track_id": "migrate_pg_gemini_20251228",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2025-12-28T15:05:00Z",
+  "updated_at": "2025-12-28T15:05:00Z",
+  "description": "Migrate the existing MongoDB RAG pipeline to PostgreSQL with pgvector and integrate Google Gemini for embedding generation."
+}
