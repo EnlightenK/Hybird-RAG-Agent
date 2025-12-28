@@ -16,7 +16,7 @@
 ## Phase 3: Ingestion Pipeline Migration
 - [x] Task: Write tests for PostgreSQL ingestion logic 72ee68f
 - [x] Task: Update `src/ingestion/ingest.py` to support PostgreSQL 5aa5534
-- [ ] Task: Write tests for chunk storage and retrieval
+- [x] Task: Write tests for chunk storage and retrieval 884a17d
 - [ ] Task: Conductor - User Manual Verification 'Ingestion Pipeline Migration' (Protocol in workflow.md)
 
 ## Phase 4: Search Tools and Agent Integration
