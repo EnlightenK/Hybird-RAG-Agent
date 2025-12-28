@@ -9,7 +9,7 @@
 ## Phase 2: Core Infrastructure Migration
 - [x] Task: Write tests for PostgreSQL connection and dependency injection b6c3046
 - [x] Task: Implement PostgreSQL connection management in `src/dependencies.py` b12388f
-- [ ] Task: Write tests for Gemini embedding provider
+- [x] Task: Write tests for Gemini embedding provider db46df5
 - [ ] Task: Implement Gemini embedding provider in `src/providers.py`
 - [ ] Task: Conductor - User Manual Verification 'Core Infrastructure Migration' (Protocol in workflow.md)
 
