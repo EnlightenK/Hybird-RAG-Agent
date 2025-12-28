@@ -2,6 +2,7 @@ import os
 import sys
 import pytest
 import asyncpg
+import json
 from unittest.mock import MagicMock, AsyncMock
 
 # Add project root to path
@@ -32,6 +33,7 @@ async def test_save_to_postgres(pg_pool):
     pipeline = DocumentIngestionPipeline(config)
     # Inject pg_pool
     pipeline.pg_pool = pg_pool
+    pipeline._initialized = True # Mark as initialized
     
     title = "Test Document"
     source = "test.md"
@@ -49,6 +51,49 @@ async def test_save_to_postgres(pg_pool):
     ]
     metadata = {"author": "Tester"}
     
-    # We expect this to fail with NotImplementedError
-    with pytest.raises(NotImplementedError):
-        await pipeline._save_to_postgres(title, source, content, chunks, metadata)
+    # Save to PostgreSQL
+    doc_id = await pipeline._save_to_postgres(title, source, content, chunks, metadata)
+    assert doc_id is not None
+    
+    # Verify in DB
+    async with pg_pool.acquire() as conn:
+        doc = await conn.fetchrow("SELECT * FROM documents WHERE id = $1", doc_id)
+        assert doc is not None
+        assert doc['filename'] == source
+        
+        chunk = await conn.fetchrow("SELECT * FROM chunks WHERE document_id = $1", doc_id)
+        assert chunk is not None
+        assert chunk['content'] == chunks[0].content
+        
+        embedding_data = chunk['embedding']
+        if isinstance(embedding_data, str):
+            embedding_list = json.loads(embedding_data)
+        else:
+            embedding_list = list(embedding_data)
+            
+        assert len(embedding_list) == 768
+        assert abs(embedding_list[0] - 0.1) < 1e-6
+
+@pytest.mark.asyncio
+async def test_clean_databases(pg_pool):
+    """Test cleaning PostgreSQL database."""
+    config = IngestionConfig()
+    pipeline = DocumentIngestionPipeline(config)
+    pipeline.pg_pool = pg_pool
+    pipeline._initialized = True
+    
+    # Ensure there is data
+    await pipeline._save_to_postgres(
+        "To Clean", "clean.md", "Content", 
+        [DocumentChunk("Content", 0, 0, 7, {}, 1, [0.0]*768)], {}
+    )
+    
+    # Clean
+    await pipeline._clean_databases()
+    
+    # Verify empty
+    async with pg_pool.acquire() as conn:
+        count_docs = await conn.fetchval("SELECT COUNT(*) FROM documents")
+        count_chunks = await conn.fetchval("SELECT COUNT(*) FROM chunks")
+        assert count_docs == 0
+        assert count_chunks == 0
