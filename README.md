@@ -36,8 +36,8 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ### 2. Clone and Setup Project
 
 ```bash
-git clone https://github.com/coleam00/Postgres-RAG-Agent.git
-cd Postgres-RAG-Agent
+git clone https://github.com/EnlightenK/Hybird-RAG-Agent.git
+cd Hybird-RAG-Agent
 
 # Create virtual environment and install dependencies
 uv venv
