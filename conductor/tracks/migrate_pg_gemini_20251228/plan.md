@@ -1,7 +1,7 @@
 # Plan: Migrate RAG Pipeline to PostgreSQL and Gemini
 
 ## Phase 1: Environment and Database Setup
-- [ ] Task: Set up PostgreSQL with pgvector (local or Docker) and update `.env`
+- [x] Task: Set up PostgreSQL with pgvector (local or Docker) and update `.env` d1368ae
 - [ ] Task: Update `pyproject.toml` with `asyncpg` and remove MongoDB dependencies
 - [ ] Task: Create PostgreSQL schema and migration scripts for `documents` and `chunks` tables
 - [ ] Task: Conductor - User Manual Verification 'Environment and Database Setup' (Protocol in workflow.md)
