@@ -3,7 +3,7 @@
 ## Phase 1: Environment and Database Setup
 - [x] Task: Set up PostgreSQL with pgvector (local or Docker) and update `.env` d1368ae
 - [x] Task: Update `pyproject.toml` with `asyncpg` and remove MongoDB dependencies 54b7efe
-- [ ] Task: Create PostgreSQL schema and migration scripts for `documents` and `chunks` tables
+- [x] Task: Create PostgreSQL schema and migration scripts for `documents` and `chunks` tables 9961a59
 - [ ] Task: Conductor - User Manual Verification 'Environment and Database Setup' (Protocol in workflow.md)
 
 ## Phase 2: Core Infrastructure Migration
