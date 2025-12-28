@@ -16,6 +16,8 @@ dependencies = [
     "aiofiles>=24.1.0",
     "openai-whisper>=20240930",
     "asyncpg>=0.31.0",
+    "google-generativeai>=0.8.6",
+    "pydantic-ai-slim[google]>=1.39.0",
 ]
 
 [build-system]
