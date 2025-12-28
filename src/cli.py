@@ -164,8 +164,8 @@ def display_welcome():
     settings = load_settings()
 
     welcome = Panel(
-        "[bold blue]MongoDB RAG Agent[/bold blue]\n\n"
-        "[green]Intelligent knowledge base search with MongoDB Atlas Vector Search[/green]\n"
+        "[bold blue]PostgreSQL RAG Agent[/bold blue]\n\n"
+        "[green]Intelligent knowledge base search with PostgreSQL pgvector[/green]\n"
         f"[dim]LLM: {settings.llm_model}[/dim]\n\n"
         "[dim]Type 'exit' to quit, 'info' for system info, 'clear' to clear screen[/dim]",
         style="blue",
